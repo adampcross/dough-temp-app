@@ -13,7 +13,7 @@ export default function DoughTempCalculator() {
     maxChilledWaterL: '70',
     maxChilledFlourKg: '0',
     levainInputMode: 'weight',
-    levainWeightKg: '0',
+    levainWeightKg: '8.5',
     levainPercentOfFlour: '20',
     levainTemp: '25',
   });
@@ -61,6 +61,7 @@ export default function DoughTempCalculator() {
     const targetPreFrictionTemp = targetFinalTemp - frictionRise;
     const maxUsableChilledWater = Math.min(waterKg, Math.max(0, maxChilledWaterL));
     const maxUsableChilledFlour = Math.min(flourKg, Math.max(0, maxChilledFlourKg));
+    const tolerance = 1e-9;
 
     const warmestAchievableInitialTemp =
       (flourKg * warmFlourTemp + waterKg * warmWaterTemp + levainHeat) / totalMass;
@@ -94,7 +95,6 @@ export default function DoughTempCalculator() {
     let warmFlourUsed = flourKg;
 
     const targetHeat = targetPreFrictionTemp * totalMass;
-    const tolerance = 1e-9;
 
     if (targetPreFrictionTemp > warmestAchievableInitialTemp + tolerance) {
       feasible = false;
@@ -107,18 +107,15 @@ export default function DoughTempCalculator() {
       message =
         'Target not achievable because it is below the coldest dough temperature possible with the available chilled ingredients.';
     } else {
-      // Target is achievable somewhere between warmest and coldest.
-      // Operational preference:
+      // Preference:
       // 1) use warm flour only
       // 2) use minimum chilled water needed
-      // 3) only use chilled flour if all usable chilled water is already fully used and more cooling is still needed
+      // 3) only use chilled flour if all usable chilled water is already fully used
 
       if (targetPreFrictionTemp >= waterOnlyColdestInitialTemp - tolerance) {
-        // Water-only solution
         const waterSpread = chilledWaterTemp - warmWaterTemp;
 
         if (Math.abs(waterSpread) < tolerance) {
-          // Water split cannot change dough temp
           chilledWaterUsed = 0;
           warmWaterUsed = waterKg;
         } else {
@@ -138,12 +135,14 @@ export default function DoughTempCalculator() {
             feasibilityType = 'calculation_error';
             message = 'A valid chilled water split could not be calculated from the inputs.';
           } else {
-            chilledWaterUsed = Math.max(0, Math.min(maxUsableChilledWater, requiredChilledWater));
+            chilledWaterUsed = Math.max(
+              0,
+              Math.min(maxUsableChilledWater, requiredChilledWater)
+            );
             warmWaterUsed = waterKg - chilledWaterUsed;
           }
         }
       } else {
-        // Need all usable chilled water, then use chilled flour for the rest
         chilledWaterUsed = maxUsableChilledWater;
         warmWaterUsed = waterKg - chilledWaterUsed;
 
@@ -171,23 +170,25 @@ export default function DoughTempCalculator() {
             feasibilityType = 'calculation_error';
             message = 'A valid chilled flour split could not be calculated from the inputs.';
           } else {
-            chilledFlourUsed = Math.max(0, Math.min(maxUsableChilledFlour, requiredChilledFlour));
+            chilledFlourUsed = Math.max(
+              0,
+              Math.min(maxUsableChilledFlour, requiredChilledFlour)
+            );
             warmFlourUsed = flourKg - chilledFlourUsed;
           }
         }
       }
     }
 
-    const actualInitialTemp =
-      feasible
-        ? (
-            warmFlourUsed * warmFlourTemp +
-            chilledFlourUsed * chilledFlourTemp +
-            warmWaterUsed * warmWaterTemp +
-            chilledWaterUsed * chilledWaterTemp +
-            levainHeat
-          ) / totalMass
-        : null;
+    const actualInitialTemp = feasible
+      ? (
+          warmFlourUsed * warmFlourTemp +
+          chilledFlourUsed * chilledFlourTemp +
+          warmWaterUsed * warmWaterTemp +
+          chilledWaterUsed * chilledWaterTemp +
+          levainHeat
+        ) / totalMass
+      : null;
 
     const actualFinalTemp =
       actualInitialTemp !== null ? actualInitialTemp + frictionRise : null;
@@ -195,7 +196,6 @@ export default function DoughTempCalculator() {
     let maxWarmFlourTempForTarget = null;
     let flourCoolingNeeded = null;
 
-    // Only really meaningful for "too cold" situations where all usable chilled water is already assumed fully used
     if (!feasible && feasibilityType === 'too_cold') {
       const nonChilledFlourKg = flourKg - maxUsableChilledFlour;
 
@@ -217,24 +217,25 @@ export default function DoughTempCalculator() {
       }
     }
 
-let warnings = [];
+    let warnings = [];
 
-if (levainWeightKg <= 0.0001) {
-  warnings.push('Levain is set to 0. Confirm this is intentional.');
-}
+    if (levainWeightKg < 0.5) {
+      warnings.push('Levain is very low or zero. Confirm this is intentional.');
+    }
 
-if (waterKg <= 0.0001) {
-  warnings.push('Water is set to 0. Confirm this is intentional.');
-}
+    if (waterKg <= 0.0001) {
+      warnings.push('Water is set to 0. Confirm this is intentional.');
+    }
 
-if (
-  warmWaterTemp === chilledWaterTemp &&
-  warmFlourTemp === chilledFlourTemp
-) {
-  warnings.push(
-    'No temperature difference between warm and chilled ingredients. You have no control over dough temperature.'
-  );
-}
+    if (
+      Math.abs(warmWaterTemp - chilledWaterTemp) < 0.0001 &&
+      Math.abs(warmFlourTemp - chilledFlourTemp) < 0.0001
+    ) {
+      warnings.push(
+        'No temperature difference exists between warm and chilled ingredients. You have no cooling control.'
+      );
+    }
+
     return {
       feasible,
       feasibilityType,
@@ -256,9 +257,6 @@ if (
       levainWaterKg,
       maxWarmFlourTempForTarget,
       flourCoolingNeeded,
-      debug: {
-        waterOnlyColdestInitialTemp,
-      },
     };
   }, [form]);
 
@@ -442,9 +440,13 @@ if (
         }
 
         .notice-text {
-          margin: 0;
+          margin: 0 0 8px 0;
           font-size: 15px;
           line-height: 1.6;
+        }
+
+        .notice-text:last-child {
+          margin-bottom: 0;
         }
 
         .method-box {
@@ -638,6 +640,15 @@ if (
                     />
                   )}
                 </div>
+
+                {result.warnings && result.warnings.length > 0 && (
+                  <div className="notice warning">
+                    <div className="notice-title">Check inputs</div>
+                    {result.warnings.map((w, i) => (
+                      <p key={i} className="notice-text">⚠️ {w}</p>
+                    ))}
+                  </div>
+                )}
 
                 <div className={`notice ${result.feasible ? 'success' : 'warning'}`}>
                   <div className="notice-title">
