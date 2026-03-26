@@ -94,7 +94,7 @@ export default function DoughTempCalculator() {
         }
       } else {
         const flourHeatAllWarm = flourKg * warmFlourTemp;
-        let requiredChilledWater =
+        const requiredChilledWater =
           (targetHeat - flourHeatAllWarm - levainHeat - waterKg * warmWaterTemp) /
           waterTempSpread;
 
@@ -180,99 +180,93 @@ export default function DoughTempCalculator() {
     ['maxChilledFlourKg', 'Max chilled flour available (kg)'],
   ];
 
-  const card = 'bg-white rounded-2xl shadow-sm border border-slate-200';
-  const inputCls = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base outline-none';
-
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 p-4 md:p-6">
-      <div className="max-w-5xl mx-auto grid gap-4 md:gap-6">
-        <div className="grid gap-2">
-          <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">Dough Temperature Calculator</h1>
-          <p className="text-sm md:text-base text-slate-600 max-w-3xl">
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.headerBlock}>
+          <h1 style={styles.h1}>Dough Temperature Calculator</h1>
+          <p style={styles.subtext}>
             Enter your flour, water and levain values. Levain is assumed to be 100% hydration.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4 md:gap-6">
-          <section className={`${card} p-4 md:p-6`}>
-            <h2 className="text-lg md:text-xl font-semibold mb-4">Inputs</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-medium text-slate-700 mb-3">Levain input mode</div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="levainInputMode"
-                      checked={form.levainInputMode === 'weight'}
-                      onChange={() => setField('levainInputMode', 'weight')}
-                    />
-                    Levain by weight (kg)
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="levainInputMode"
-                      checked={form.levainInputMode === 'percent'}
-                      onChange={() => setField('levainInputMode', 'percent')}
-                    />
-                    Levain as % of flour
-                  </label>
-                </div>
-              </div>
+        <div style={styles.mainGrid}>
+          <section style={styles.card}>
+            <h2 style={styles.h2}>Inputs</h2>
 
+            <div style={styles.modeBox}>
+              <div style={styles.label}>Levain input mode</div>
+              <label style={styles.radioRow}>
+                <input
+                  type="radio"
+                  name="levainInputMode"
+                  checked={form.levainInputMode === 'weight'}
+                  onChange={() => setField('levainInputMode', 'weight')}
+                />
+                <span>Levain by weight (kg)</span>
+              </label>
+              <label style={styles.radioRow}>
+                <input
+                  type="radio"
+                  name="levainInputMode"
+                  checked={form.levainInputMode === 'percent'}
+                  onChange={() => setField('levainInputMode', 'percent')}
+                />
+                <span>Levain as % of flour</span>
+              </label>
+            </div>
+
+            <div style={styles.inputGrid}>
               {fields.map(([key, label]) => (
-                <label key={key} className="grid gap-2">
-                  <span className="text-sm font-medium text-slate-700">{label}</span>
+                <label key={key} style={styles.field}>
+                  <span style={styles.label}>{label}</span>
                   <input
                     type="number"
                     step="0.01"
                     inputMode="decimal"
-                    className={inputCls}
                     value={form[key]}
                     onChange={(e) => setField(key, e.target.value)}
+                    style={styles.input}
                   />
                 </label>
               ))}
 
               {form.levainInputMode === 'weight' ? (
-                <label className="grid gap-2">
-                  <span className="text-sm font-medium text-slate-700">Levain weight (kg)</span>
+                <label style={styles.field}>
+                  <span style={styles.label}>Levain weight (kg)</span>
                   <input
                     type="number"
                     step="0.01"
                     inputMode="decimal"
-                    className={inputCls}
                     value={form.levainWeightKg}
                     onChange={(e) => setField('levainWeightKg', e.target.value)}
+                    style={styles.input}
                   />
                 </label>
               ) : (
-                <label className="grid gap-2">
-                  <span className="text-sm font-medium text-slate-700">Levain as % of flour</span>
+                <label style={styles.field}>
+                  <span style={styles.label}>Levain as % of flour</span>
                   <input
                     type="number"
                     step="0.01"
                     inputMode="decimal"
-                    className={inputCls}
                     value={form.levainPercentOfFlour}
                     onChange={(e) => setField('levainPercentOfFlour', e.target.value)}
+                    style={styles.input}
                   />
                 </label>
               )}
             </div>
           </section>
 
-          <section className={`${card} p-4 md:p-6`}>
-            <h2 className="text-lg md:text-xl font-semibold mb-4">Result</h2>
+          <section style={styles.card}>
+            <h2 style={styles.h2}>Result</h2>
 
             {result.error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                {result.error}
-              </div>
+              <div style={styles.warningBox}>{result.error}</div>
             ) : (
-              <div className="grid gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div style={styles.resultStack}>
+                <div style={styles.metricsGrid}>
                   <Metric label="Target pre-friction temp" value={`${result.targetPreFrictionTemp.toFixed(2)} °C`} />
                   <Metric label="Estimated final dough temp" value={result.actualFinalTemp !== null ? `${result.actualFinalTemp.toFixed(2)} °C` : '—'} />
                   <Metric label="Warm water" value={`${result.warmWater.toFixed(2)} L`} />
@@ -281,6 +275,7 @@ export default function DoughTempCalculator() {
                   <Metric label="Chilled flour" value={`${result.chilledFlour.toFixed(2)} kg`} />
                   <Metric label="Levain total" value={`${result.levainWeightKg.toFixed(2)} kg`} />
                   <Metric label="Levain flour / water" value={`${result.levainFlourKg.toFixed(2)} / ${result.levainWaterKg.toFixed(2)} kg`} />
+
                   {!result.feasible && (
                     <>
                       <Metric label="Coldest achievable final dough temp" value={`${result.coldestAchievableFinalTemp.toFixed(2)} °C`} />
@@ -289,22 +284,22 @@ export default function DoughTempCalculator() {
                   )}
                 </div>
 
-                <div className={`rounded-xl p-4 border ${result.feasible ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                  <div className="font-medium mb-1">{result.feasible ? 'Feasible mix' : 'Constraint issue'}</div>
-                  <p className="text-sm leading-6">
+                <div style={result.feasible ? styles.successBox : styles.warningBox}>
+                  <div style={styles.boxTitle}>{result.feasible ? 'Feasible mix' : 'Constraint issue'}</div>
+                  <p style={styles.boxText}>
                     {result.feasible
                       ? `Use ${result.warmWater.toFixed(2)} L of warm water and ${result.chilledWater.toFixed(2)} L of chilled water. This gives an initial mix temperature of ${result.actualInitialTemp?.toFixed(2)} °C and an estimated final dough temperature of ${result.actualFinalTemp?.toFixed(2)} °C after ${parseNum(form.frictionRise).toFixed(2)} °C friction.`
                       : `${result.message} Coldest achievable final dough temperature with the available chilled ingredients is ${result.coldestAchievableFinalTemp.toFixed(2)} °C.${result.maxWarmFlourTempForTarget !== null ? ` To still hit the target, the warm flour would need to be at or below ${result.maxWarmFlourTempForTarget.toFixed(2)} °C.` : ''}${result.flourCoolingNeeded !== null ? ` Flour would need to be cooled by ${result.flourCoolingNeeded.toFixed(2)} °C.` : ''}`}
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                  <h3 className="font-medium mb-2">Method</h3>
-                  <p className="text-sm text-slate-600 leading-6 mb-3">
+                <div style={styles.methodBox}>
+                  <h3 style={styles.h3}>Method</h3>
+                  <p style={styles.methodText}>
                     Levain is assumed to be 100% hydration, so its entered total weight is split evenly into flour and water at the levain temperature.
                   </p>
-                  <p className="text-sm text-slate-600 leading-6">
-                    The app checks feasibility first by calculating the coldest possible dough temperature using all available chilled water and chilled flour. Only if the target can be reached does it solve for the minimum chilled water required. If the target cannot be reached, it shows the coldest achievable final dough temperature and the highest flour temperature that would still make the target possible.
+                  <p style={styles.methodText}>
+                    The app checks feasibility first by calculating the coldest possible dough temperature using all available chilled water and chilled flour. Only if the target can be reached does it solve for the minimum chilled water required.
                   </p>
                 </div>
               </div>
@@ -318,9 +313,164 @@ export default function DoughTempCalculator() {
 
 function Metric({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-sm text-slate-600 mb-1">{label}</div>
-      <div className="text-xl font-semibold tracking-tight">{value}</div>
+    <div style={styles.metric}>
+      <div style={styles.metricLabel}>{label}</div>
+      <div style={styles.metricValue}>{value}</div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    background: '#f1f5f9',
+    padding: '16px',
+    fontFamily: 'Arial, sans-serif',
+    color: '#0f172a',
+    boxSizing: 'border-box',
+  },
+  container: {
+    maxWidth: '1100px',
+    margin: '0 auto',
+  },
+  headerBlock: {
+    marginBottom: '16px',
+  },
+  h1: {
+    margin: 0,
+    fontSize: '32px',
+    lineHeight: 1.1,
+    fontWeight: 700,
+  },
+  h2: {
+    marginTop: 0,
+    marginBottom: '16px',
+    fontSize: '24px',
+    fontWeight: 700,
+  },
+  h3: {
+    marginTop: 0,
+    marginBottom: '10px',
+    fontSize: '18px',
+    fontWeight: 700,
+  },
+  subtext: {
+    marginTop: '8px',
+    marginBottom: 0,
+    color: '#475569',
+    fontSize: '15px',
+    lineHeight: 1.5,
+  },
+  mainGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: '16px',
+  },
+  card: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '20px',
+    padding: '20px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+  },
+  modeBox: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '16px',
+    background: '#f8fafc',
+    marginBottom: '16px',
+  },
+  radioRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '16px',
+    marginTop: '12px',
+  },
+  inputGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: '16px',
+  },
+  field: {
+    display: 'grid',
+    gap: '8px',
+  },
+  label: {
+    fontSize: '15px',
+    fontWeight: 700,
+    color: '#0f172a',
+  },
+  input: {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '16px',
+    fontSize: '18px',
+    borderRadius: '16px',
+    border: '2px solid #d1d5db',
+    outline: 'none',
+    background: '#fff',
+  },
+  resultStack: {
+    display: 'grid',
+    gap: '16px',
+  },
+  metricsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: '12px',
+  },
+  metric: {
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    borderRadius: '16px',
+    padding: '14px',
+  },
+  metricLabel: {
+    fontSize: '13px',
+    color: '#475569',
+    marginBottom: '6px',
+  },
+  metricValue: {
+    fontSize: '24px',
+    fontWeight: 700,
+    lineHeight: 1.2,
+  },
+  successBox: {
+    border: '1px solid #a7f3d0',
+    background: '#ecfdf5',
+    color: '#065f46',
+    borderRadius: '16px',
+    padding: '16px',
+  },
+  warningBox: {
+    border: '1px solid #fcd34d',
+    background: '#fffbeb',
+    color: '#92400e',
+    borderRadius: '16px',
+    padding: '16px',
+  },
+  boxTitle: {
+    fontWeight: 700,
+    marginBottom: '8px',
+    fontSize: '16px',
+  },
+  boxText: {
+    margin: 0,
+    fontSize: '15px',
+    lineHeight: 1.6,
+  },
+  methodBox: {
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    borderRadius: '16px',
+    padding: '16px',
+  },
+  methodText: {
+    marginTop: 0,
+    marginBottom: '10px',
+    color: '#475569',
+    fontSize: '14px',
+    lineHeight: 1.6,
+  },
+};
