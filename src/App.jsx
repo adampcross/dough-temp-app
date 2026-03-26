@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function DoughTempCalculator() {
   const [form, setForm] = useState({
@@ -186,6 +187,7 @@ export default function DoughTempCalculator() {
           )}
         </section>
       </div>
+      <Analytics />
     </div>
   );
 }
