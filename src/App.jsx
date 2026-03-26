@@ -12,6 +12,10 @@ export default function DoughTempCalculator() {
     chilledFlourTemp: 25,
     maxChilledWaterL: 70,
     maxChilledFlourKg: 0,
+    levainInputMode: 'weight',
+    levainWeightKg: 0,
+    levainPercentOfFlour: 20,
+    levainTemp: 25,
   });
 
   const parseNum = (value) => {
@@ -34,19 +38,29 @@ export default function DoughTempCalculator() {
     const chilledFlourTemp = parseNum(form.chilledFlourTemp);
     const maxChilledWaterL = parseNum(form.maxChilledWaterL);
     const maxChilledFlourKg = parseNum(form.maxChilledFlourKg);
+    const levainTemp = parseNum(form.levainTemp);
+
+    const levainWeightKg =
+      form.levainInputMode === 'percent'
+        ? flourKg * (parseNum(form.levainPercentOfFlour) / 100)
+        : parseNum(form.levainWeightKg);
+
+    const levainFlourKg = levainWeightKg / 2;
+    const levainWaterKg = levainWeightKg / 2;
 
     const targetPreFrictionTemp = targetFinalTemp - frictionRise;
-    const totalMass = flourKg + waterKg;
+    const totalMass = flourKg + waterKg + levainWeightKg;
 
-    if (flourKg <= 0 || waterKg < 0 || totalMass <= 0) {
-      return { error: 'Enter valid flour and water amounts.' };
+    if (flourKg <= 0 || waterKg < 0 || levainWeightKg < 0 || totalMass <= 0) {
+      return { error: 'Enter valid flour, water and levain amounts.' };
     }
 
     const targetHeat = targetPreFrictionTemp * totalMass;
+    const levainHeat = levainWeightKg * levainTemp;
     const flourHeatAllWarm = flourKg * warmFlourTemp;
 
     const chilledWaterNeeded =
-      (targetHeat - flourHeatAllWarm - waterKg * warmWaterTemp) /
+      (targetHeat - flourHeatAllWarm - levainHeat - waterKg * warmWaterTemp) /
       (chilledWaterTemp - warmWaterTemp);
 
     let chilledWater = chilledWaterNeeded;
@@ -67,25 +81,34 @@ export default function DoughTempCalculator() {
       chilledWater = waterKg;
       warmWater = 0;
 
-      const remainingHeatAfterAllChilledWater =
-        targetHeat - waterKg * chilledWaterTemp;
+      if (chilledFlourTemp === warmFlourTemp) {
+        chilledFlour = 0;
+      } else {
+        const remainingHeatAfterAllChilledWater =
+          targetHeat - waterKg * chilledWaterTemp;
 
-      const chilledFlourNeeded =
-        (remainingHeatAfterAllChilledWater - flourKg * warmFlourTemp) /
-        (chilledFlourTemp - warmFlourTemp);
+        const chilledFlourNeeded =
+          (remainingHeatAfterAllChilledWater - flourKg * warmFlourTemp - levainHeat) /
+          (chilledFlourTemp - warmFlourTemp);
 
-      chilledFlour = chilledFlourNeeded;
-      warmFlour = flourKg - chilledFlour;
+        chilledFlour = chilledFlourNeeded;
+        warmFlour = flourKg - chilledFlour;
+      }
     }
 
     if (chilledWater > maxChilledWaterL + 1e-9) {
       feasible = false;
-      message = `Not feasible with the current chilled water limit. Required chilled water is ${chilledWater.toFixed(2)} L, but the limit is ${maxChilledWaterL.toFixed(2)} L.`;
+      message = `Not feasible with the current chilled water limit. Required chilled water is ${chilledWater.toFixed(
+        2
+      )} L, but the limit is ${maxChilledWaterL.toFixed(2)} L.`;
     }
 
     if (chilledFlour > maxChilledFlourKg + 1e-9) {
       feasible = false;
-      message = `Not feasible with the current chilled flour limit. Required chilled flour is ${chilledFlour.toFixed(2)} kg, but the limit is ${maxChilledFlourKg.toFixed(2)} kg.`;
+      message = `Not feasible with the current chilled flour limit. Required chilled flour is ${Math.max(
+        0,
+        chilledFlour
+      ).toFixed(2)} kg, but the limit is ${maxChilledFlourKg.toFixed(2)} kg.`;
     }
 
     if (warmWater < -1e-9 || warmFlour < -1e-9) {
@@ -96,9 +119,10 @@ export default function DoughTempCalculator() {
     const actualInitialTemp = feasible
       ? (
           (warmFlour * warmFlourTemp +
-            chilledFlour * chilledFlourTemp +
+            Math.max(0, chilledFlour) * chilledFlourTemp +
             warmWater * warmWaterTemp +
-            chilledWater * chilledWaterTemp) /
+            chilledWater * chilledWaterTemp +
+            levainHeat) /
           totalMass
         )
       : null;
@@ -107,6 +131,39 @@ export default function DoughTempCalculator() {
       feasible && actualInitialTemp !== null
         ? actualInitialTemp + frictionRise
         : null;
+
+    const maxUsableChilledWater = Math.min(waterKg, maxChilledWaterL);
+    const maxUsableChilledFlour = Math.min(flourKg, maxChilledFlourKg);
+
+    const coldestAchievableInitialTemp =
+      ((flourKg - maxUsableChilledFlour) * warmFlourTemp +
+        maxUsableChilledFlour * chilledFlourTemp +
+        (waterKg - maxUsableChilledWater) * warmWaterTemp +
+        maxUsableChilledWater * chilledWaterTemp +
+        levainHeat) /
+      totalMass;
+
+    const coldestAchievableFinalTemp =
+      coldestAchievableInitialTemp + frictionRise;
+
+    let maxWarmFlourTempForTarget = null;
+    let flourTempReductionNeeded = null;
+
+    if (!feasible && flourKg > maxUsableChilledFlour) {
+      const nonChilledFlourKg = flourKg - maxUsableChilledFlour;
+      const targetTotalHeat = targetPreFrictionTemp * totalMass;
+
+      const fixedHeat =
+        (waterKg - maxUsableChilledWater) * warmWaterTemp +
+        maxUsableChilledWater * chilledWaterTemp +
+        maxUsableChilledFlour * chilledFlourTemp +
+        levainHeat;
+
+      maxWarmFlourTempForTarget =
+        (targetTotalHeat - fixedHeat) / nonChilledFlourKg;
+
+      flourTempReductionNeeded = warmFlourTemp - maxWarmFlourTempForTarget;
+    }
 
     return {
       feasible,
@@ -118,6 +175,12 @@ export default function DoughTempCalculator() {
       warmFlour: Math.max(0, warmFlour),
       actualInitialTemp,
       actualFinalTemp,
+      coldestAchievableFinalTemp,
+      maxWarmFlourTempForTarget,
+      flourTempReductionNeeded,
+      levainWeightKg,
+      levainFlourKg,
+      levainWaterKg,
     };
   }, [form]);
 
@@ -130,62 +193,299 @@ export default function DoughTempCalculator() {
     ['chilledWaterTemp', 'Chilled water temp (°C)'],
     ['warmFlourTemp', 'Warm flour temp (°C)'],
     ['chilledFlourTemp', 'Chilled flour temp (°C)'],
+    ['levainTemp', 'Levain temp (°C)'],
     ['maxChilledWaterL', 'Max chilled water available (L)'],
     ['maxChilledFlourKg', 'Max chilled flour available (kg)'],
   ];
 
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-      <h1>Dough Temperature Calculator</h1>
-      <p>
-        Enter your flour, water and temperature values. The calculator solves for the minimum chilled water needed to hit the target final dough temperature.
-      </p>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <h1 style={styles.h1}>Dough Temperature Calculator</h1>
+        <p style={styles.p}>
+          Enter your batch values. Levain is assumed to be 100% hydration.
+        </p>
 
-      <div style={{ display: 'grid', gap: '24px', gridTemplateColumns: '1fr 1fr' }}>
-        <section style={{ border: '1px solid #ccc', borderRadius: '12px', padding: '20px' }}>
-          <h2>Inputs</h2>
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {fields.map(([key, label]) => (
-              <label key={key} style={{ display: 'grid', gap: '6px' }}>
-                <span>{label}</span>
+        <div style={styles.grid}>
+          <section style={styles.card}>
+            <h2 style={styles.h2}>Inputs</h2>
+
+            <div style={styles.levainModeBox}>
+              <div style={styles.label}>Levain input mode</div>
+              <label style={styles.radioLabel}>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={form[key]}
-                  onChange={(e) => setField(key, e.target.value)}
-                  style={{ padding: '10px', fontSize: '16px' }}
+                  type="radio"
+                  name="levainInputMode"
+                  checked={form.levainInputMode === 'weight'}
+                  onChange={() => setField('levainInputMode', 'weight')}
                 />
+                <span>Levain by weight (kg)</span>
               </label>
-            ))}
-          </div>
-        </section>
-
-        <section style={{ border: '1px solid #ccc', borderRadius: '12px', padding: '20px' }}>
-          <h2>Result</h2>
-
-          {result.error ? (
-            <div>{result.error}</div>
-          ) : (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div><strong>Target pre-friction temp:</strong> {result.targetPreFrictionTemp.toFixed(2)} °C</div>
-              <div><strong>Estimated final dough temp:</strong> {result.actualFinalTemp !== null ? `${result.actualFinalTemp.toFixed(2)} °C` : '—'}</div>
-              <div><strong>Warm water:</strong> {result.warmWater.toFixed(2)} L</div>
-              <div><strong>Chilled water:</strong> {result.chilledWater.toFixed(2)} L</div>
-              <div><strong>Warm flour:</strong> {result.warmFlour.toFixed(2)} kg</div>
-              <div><strong>Chilled flour:</strong> {result.chilledFlour.toFixed(2)} kg</div>
-
-              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: result.feasible ? '#e8f7ee' : '#fff4e5' }}>
-                <strong>{result.feasible ? 'Feasible mix' : 'Constraint issue'}</strong>
-                <p>
-                  {result.feasible
-                    ? `Use ${result.warmWater.toFixed(2)} L of warm water and ${result.chilledWater.toFixed(2)} L of chilled water. This gives an initial mix temperature of ${result.actualInitialTemp?.toFixed(2)} °C and an estimated final dough temperature of ${result.actualFinalTemp?.toFixed(2)} °C after ${parseNum(form.frictionRise).toFixed(2)} °C friction.`
-                    : result.message}
-                </p>
-              </div>
+              <label style={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="levainInputMode"
+                  checked={form.levainInputMode === 'percent'}
+                  onChange={() => setField('levainInputMode', 'percent')}
+                />
+                <span>Levain as % of flour</span>
+              </label>
             </div>
-          )}
-        </section>
+
+            <div style={styles.inputGrid}>
+              {fields.map(([key, label]) => (
+                <label key={key} style={styles.field}>
+                  <span style={styles.label}>{label}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form[key]}
+                    onChange={(e) => setField(key, e.target.value)}
+                    style={styles.input}
+                  />
+                </label>
+              ))}
+
+              {form.levainInputMode === 'weight' ? (
+                <label style={styles.field}>
+                  <span style={styles.label}>Levain weight (kg)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.levainWeightKg}
+                    onChange={(e) => setField('levainWeightKg', e.target.value)}
+                    style={styles.input}
+                  />
+                </label>
+              ) : (
+                <label style={styles.field}>
+                  <span style={styles.label}>Levain as % of flour</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.levainPercentOfFlour}
+                    onChange={(e) =>
+                      setField('levainPercentOfFlour', e.target.value)
+                    }
+                    style={styles.input}
+                  />
+                </label>
+              )}
+            </div>
+          </section>
+
+          <section style={styles.card}>
+            <h2 style={styles.h2}>Result</h2>
+
+            {result.error ? (
+              <div style={styles.warningBox}>{result.error}</div>
+            ) : (
+              <>
+                <div style={styles.metricsGrid}>
+                  <Metric
+                    label="Target pre-friction temp"
+                    value={`${result.targetPreFrictionTemp.toFixed(2)} °C`}
+                  />
+                  <Metric
+                    label="Estimated final dough temp"
+                    value={
+                      result.actualFinalTemp !== null
+                        ? `${result.actualFinalTemp.toFixed(2)} °C`
+                        : '—'
+                    }
+                  />
+                  <Metric
+                    label="Warm water"
+                    value={`${result.warmWater.toFixed(2)} L`}
+                  />
+                  <Metric
+                    label="Chilled water"
+                    value={`${result.chilledWater.toFixed(2)} L`}
+                  />
+                  <Metric
+                    label="Warm flour"
+                    value={`${result.warmFlour.toFixed(2)} kg`}
+                  />
+                  <Metric
+                    label="Chilled flour"
+                    value={`${result.chilledFlour.toFixed(2)} kg`}
+                  />
+                  <Metric
+                    label="Levain total"
+                    value={`${result.levainWeightKg.toFixed(2)} kg`}
+                  />
+                  <Metric
+                    label="Levain flour / water"
+                    value={`${result.levainFlourKg.toFixed(2)} / ${result.levainWaterKg.toFixed(2)} kg`}
+                  />
+
+                  {!result.feasible && (
+                    <>
+                      <Metric
+                        label="Coldest achievable final dough temp"
+                        value={`${result.coldestAchievableFinalTemp.toFixed(
+                          2
+                        )} °C`}
+                      />
+                      <Metric
+                        label="Max warm flour temp to still hit target"
+                        value={
+                          result.maxWarmFlourTempForTarget !== null
+                            ? `${result.maxWarmFlourTempForTarget.toFixed(2)} °C`
+                            : '—'
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+
+                <div
+                  style={
+                    result.feasible ? styles.successBox : styles.warningBox
+                  }
+                >
+                  <strong>
+                    {result.feasible ? 'Feasible mix' : 'Target not achievable'}
+                  </strong>
+                  <p style={{ marginTop: 8, marginBottom: 0 }}>
+                    {result.feasible
+                      ? `Use ${result.warmWater.toFixed(
+                          2
+                        )} L of warm water and ${result.chilledWater.toFixed(
+                          2
+                        )} L of chilled water.`
+                      : `${result.message} Coldest achievable final dough temperature is ${result.coldestAchievableFinalTemp.toFixed(
+                          2
+                        )} °C.`}
+                  </p>
+
+                  {!result.feasible &&
+                    result.flourTempReductionNeeded !== null && (
+                      <p style={{ marginTop: 8, marginBottom: 0 }}>
+                        With all usable chilled water already applied, flour
+                        would need to be cooler by{' '}
+                        {result.flourTempReductionNeeded.toFixed(2)} °C.
+                      </p>
+                    )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
+
+function Metric({ label, value }) {
+  return (
+    <div style={styles.metric}>
+      <div style={styles.metricLabel}>{label}</div>
+      <div style={styles.metricValue}>{value}</div>
+    </div>
+  );
+}
+
+const styles = {
+  page: {
+    fontFamily: 'Arial, sans-serif',
+    background: '#f4f6f8',
+    minHeight: '100vh',
+    padding: '16px',
+    boxSizing: 'border-box',
+  },
+  container: {
+    maxWidth: '1100px',
+    margin: '0 auto',
+  },
+  h1: {
+    fontSize: '32px',
+    marginBottom: '8px',
+  },
+  h2: {
+    fontSize: '22px',
+    marginTop: 0,
+    marginBottom: '16px',
+  },
+  p: {
+    color: '#555',
+    marginBottom: '20px',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: '16px',
+  },
+  card: {
+    background: '#fff',
+    borderRadius: '16px',
+    padding: '20px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+  },
+  inputGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+  },
+  field: {
+    display: 'grid',
+    gap: '6px',
+  },
+  label: {
+    fontSize: '14px',
+    fontWeight: 600,
+  },
+  input: {
+    padding: '12px',
+    fontSize: '16px',
+    borderRadius: '10px',
+    border: '1px solid #ccc',
+  },
+  levainModeBox: {
+    marginBottom: '16px',
+    padding: '12px',
+    borderRadius: '12px',
+    background: '#f7f7f7',
+    border: '1px solid #ddd',
+  },
+  radioLabel: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    marginTop: '8px',
+    fontSize: '14px',
+  },
+  metricsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+    marginBottom: '16px',
+  },
+  metric: {
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '14px',
+  },
+  metricLabel: {
+    fontSize: '13px',
+    color: '#555',
+    marginBottom: '6px',
+  },
+  metricValue: {
+    fontSize: '22px',
+    fontWeight: 700,
+  },
+  successBox: {
+    background: '#eaf8ef',
+    border: '1px solid #b7e4c7',
+    borderRadius: '12px',
+    padding: '14px',
+  },
+  warningBox: {
+    background: '#fff4e5',
+    border: '1px solid #f3d19c',
+    borderRadius: '12px',
+    padding: '14px',
+  },
+};
